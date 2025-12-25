@@ -1,44 +1,39 @@
+use actix_web::{middleware::Logger, web, App, HttpRequest, HttpServer, Responder};
+use actix_ws::Message;
+use futures::StreamExt;
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use std::sync::Mutex;
+async fn ws(req: HttpRequest, body: web::Payload) -> actix_web::Result<impl Responder> {
+    let (response, mut session, mut msg_stream) = actix_ws::handle(&req, body)?;
 
-struct AppStateWithCounter {
-    counter: Mutex<i32>,
-}
+    actix_web::rt::spawn(async move {
+        while let Some(Ok(msg)) = msg_stream.next().await {
+            match msg {
+                Message::Ping(bytes) => {
+                    if session.pong(&bytes).await.is_err() {
+                        return;
+                    }
+                }
+                Message::Text(msg) => println!("Got text: {msg}"),
+                _ => break,
+            }
+        }
 
-async fn index(data: web::Data<AppStateWithCounter>) -> String {
-    let mut counter = data.counter.lock().unwrap();
-    *counter += 1;
+        let _ = session.close(None).await;
+    });
 
-    format!("Request number: {counter}")
-}
-
-#[get("/")]
-async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
-}
-
-#[post("/echo")]
-async fn echo(req_body: String) -> impl Responder {
-    HttpResponse::Ok().body(req_body)
-}
-
-async fn manual_hello() -> impl Responder {
-    HttpResponse::Ok().body("Hey there!")
+    Ok(response)
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let counter = web::Data::new(AppStateWithCounter {
-        counter: Mutex::new(0),
-    });
-
     HttpServer::new(move || {
         App::new()
-            .app_data(counter.clone())
-            .route("/", web::get().to(index))
+            .wrap(Logger::default())
+            .route("/ws", web::get().to(ws))
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind("127.0.0.1:8080")?
     .run()
-    .await
+    .await?;
+
+    Ok(())
 }
