@@ -1152,6 +1152,7 @@ dependencies = [
  "actix-ws",
  "env_logger",
  "futures",
+ "rand",
  "tokio",
 ]
 
