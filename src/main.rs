@@ -214,6 +214,14 @@ async fn main() -> std::io::Result<()> {
     // create shared application state, defined outside main, but create the value inside main
     let state: SharedState = Arc::new(Mutex::new(AppState::default()));
 
+    // Get port from environment variable (AWS App Runner injects PORT)
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(8080);
+
+    println!("Starting server on 0.0.0.0:{}", port);
+
     HttpServer::new(move || {
         App::new()
             .wrap(Logger::default()) // logs each http request
@@ -221,7 +229,7 @@ async fn main() -> std::io::Result<()> {
             .route("/", web::get().to(index)) // serve index.html
             .route("/ws", web::get().to(ws)) // registers a route
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind(("0.0.0.0", port))?
     .run()
     .await?;
 
