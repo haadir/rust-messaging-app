@@ -221,7 +221,7 @@ async fn main() -> std::io::Result<()> {
             .route("/", web::get().to(index)) // serve index.html
             .route("/ws", web::get().to(ws)) // registers a route
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await?;
 
